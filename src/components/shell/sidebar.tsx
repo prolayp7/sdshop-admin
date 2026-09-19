@@ -47,7 +47,7 @@ function SidebarContent({ pathname, onNavigate, collapsed = false }: { pathname:
         {!collapsed && (
           <span className="leading-tight">
             <span className="block text-[13.5px] font-semibold tracking-tight text-white">
-              UK Computer Shop
+              SD Computer Shop
             </span>
             <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-label">
               Administration

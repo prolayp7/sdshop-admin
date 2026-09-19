@@ -138,8 +138,8 @@ export default function LoginPage() {
               <stop offset="100%" stopColor="#040914" />
             </radialGradient>
             <radialGradient id="nebula" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#5b6ecb" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#5b6ecb" stopOpacity="0" />
+              <stop offset="0%" stopColor="#2a7de1" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#2a7de1" stopOpacity="0" />
             </radialGradient>
             <linearGradient id="terrain" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#26364c" />
@@ -151,13 +151,13 @@ export default function LoginPage() {
               <stop offset="100%" stopColor="#0c0f14" />
             </linearGradient>
             <radialGradient id="core" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#fff3d6" />
-              <stop offset="35%" stopColor="#ff8a00" />
-              <stop offset="100%" stopColor="#c23a12" />
+              <stop offset="0%" stopColor="#e6f3ff" />
+              <stop offset="35%" stopColor="#1e90ff" />
+              <stop offset="100%" stopColor="#0b4fb0" />
             </radialGradient>
             <radialGradient id="halo" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#ff8a00" stopOpacity="0.55" />
-              <stop offset="100%" stopColor="#ff8a00" stopOpacity="0" />
+              <stop offset="0%" stopColor="#1e90ff" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="#1e90ff" stopOpacity="0" />
             </radialGradient>
             <filter id="blurGlow" x="-100%" y="-100%" width="300%" height="300%">
               <feGaussianBlur stdDeviation="16" />
@@ -195,7 +195,7 @@ export default function LoginPage() {
           <g transform="translate(255,505) rotate(-7)">
             <ellipse cx="55" cy="0" rx="95" ry="95" fill="url(#halo)" filter="url(#blurGlow)" />
             <rect x="-95" y="-30" width="180" height="60" rx="30" fill="url(#podBody)" />
-            <rect x="-70" y="-11" width="14" height="14" rx="2" fill="#ff8a00" opacity="0.85" />
+            <rect x="-70" y="-11" width="14" height="14" rx="2" fill="#1e90ff" opacity="0.85" />
             <circle cx="55" cy="0" r="24" fill="url(#core)" />
           </g>
         </svg>
@@ -207,7 +207,7 @@ export default function LoginPage() {
             <span className="flex size-9 items-center justify-center rounded-md bg-accent text-accent-ink">
               <LockKeyhole className="size-[18px]" aria-hidden="true" />
             </span>
-            <span className="text-[14.5px] font-semibold tracking-[-0.01em]">UK Computer Shop</span>
+            <span className="text-[14.5px] font-semibold tracking-[-0.01em]">SD Computer Shop</span>
           </div>
           <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium tracking-[0.01em] text-sidebar-ink">
             Operations desk
@@ -258,7 +258,7 @@ export default function LoginPage() {
             <span className="flex size-9 items-center justify-center rounded-md bg-sidebar text-accent">
               <LockKeyhole className="size-[18px]" aria-hidden="true" />
             </span>
-            <span className="text-[14.5px] font-semibold text-ink">UK Computer Shop</span>
+            <span className="text-[14.5px] font-semibold text-ink">SD Computer Shop</span>
           </div>
 
           <p className="text-[12.5px] font-semibold uppercase tracking-[0.08em] text-accent-strong">Welcome back</p>

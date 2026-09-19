@@ -17,8 +17,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "UK Computer Shop · Admin",
-  description: "Back-office admin panel for UK Computer Shop.",
+  title: "SD Computer Shop · Admin",
+  description: "Back-office admin panel for SD Computer Shop.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
