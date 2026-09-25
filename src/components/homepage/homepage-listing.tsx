@@ -82,7 +82,7 @@ export function HomepageListing() {
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
           <label className="flex items-center gap-2 text-xs font-semibold text-ink-secondary"><span className="relative inline-flex h-5 w-9 shrink-0"><input type="checkbox" checked={section.isVisible} onChange={() => void toggleVisible(section)} className="peer sr-only" /><span className="absolute inset-0 rounded-full bg-border-strong transition-colors peer-checked:bg-positive" /><span className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" /></span>{section.isVisible ? "Visible" : "Hidden"}</label>
           {section.type === "HERO"
-            ? <div className="flex items-center gap-2">{link ? <Link href={link} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Manage slides<ExternalLink className="h-3.5 w-3.5" /></Link> : null}<button type="button" onClick={() => setEditing(section)} className="h-8 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit side cards</button></div>
+            ? <div className="flex items-center gap-2">{link ? <Link href={link} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Manage slides<ExternalLink className="h-3.5 w-3.5" /></Link> : null}<button type="button" onClick={() => setEditing(section)} className="h-8 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit hero content</button></div>
             : canConfigure ? <button type="button" onClick={() => setEditing(section)} className="h-8 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit content</button>
             : link ? <Link href={link} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit content<ExternalLink className="h-3.5 w-3.5" /></Link>
             : <span className="text-xs text-ink-faint">No settings</span>}
@@ -123,6 +123,10 @@ function HeroCardsDialog({ section, onClose, onSaved }: { section: Section; onCl
   const [imagePreviews, setImagePreviews] = useState<(string | null)[]>([null, null]);
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([null, null]);
+  const [dispatchEnabled, setDispatchEnabled] = useState(section.config.dispatchEnabled !== false);
+  const [dispatchText, setDispatchText] = useState(typeof section.config.dispatchText === "string" ? section.config.dispatchText : "");
+  const [dispatchDescription, setDispatchDescription] = useState(typeof section.config.dispatchDescription === "string" ? section.config.dispatchDescription : "");
+  const [trustLine, setTrustLine] = useState(typeof section.config.trustLine === "string" ? section.config.trustLine : "");
 
   function updateCard(index: number, field: keyof HeroCard, value: string) {
     setCards((current) => current.map((card, i) => (i === index ? { ...card, [field]: value } : card)));
@@ -152,14 +156,24 @@ function HeroCardsDialog({ section, onClose, onSaved }: { section: Section; onCl
         if (!uploadResponse.ok) throw new Error(apiMessage(uploadPayload, "The image could not be uploaded."));
         return { ...card, image: ((uploadPayload.data ?? uploadPayload) as MediaItem).url };
       }));
-      await saveConfig(section.id, { cards: nextCards }); onClose(); await onSaved();
+      await saveConfig(section.id, { cards: nextCards, dispatchEnabled, dispatchText: dispatchText.trim() || undefined, dispatchDescription: dispatchDescription.trim() || undefined, trustLine: trustLine.trim() || undefined }); onClose(); await onSaved();
     }
     catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Section could not be saved."); }
     finally { setSaving(false); }
   }
 
-  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="top-0 left-0 right-auto flex h-full max-w-xl translate-x-0 translate-y-0 flex-col rounded-none data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100"><DialogHeader><DialogTitle>Hero side cards</DialogTitle><DialogDescription>The two promo cards next to the hero carousel.</DialogDescription></DialogHeader><form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-1 flex-col">{error ? <div role="alert" className="mb-3 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
+  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent className="top-0 left-0 right-auto flex h-full max-w-xl translate-x-0 translate-y-0 flex-col rounded-none data-open:slide-in-from-left data-open:zoom-in-100 data-closed:slide-out-to-left data-closed:zoom-out-100"><DialogHeader><DialogTitle>Hero content</DialogTitle><DialogDescription>The announcement bar, promo cards and trust line around the hero carousel.</DialogDescription></DialogHeader><form onSubmit={(event) => void submit(event)} className="flex min-h-0 flex-1 flex-col">{error ? <div role="alert" className="mb-3 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
   <div className="flex-1 space-y-5 overflow-y-auto pr-1">
+  <div>
+    <p className="text-[13px] font-semibold text-ink">Announcement bar</p>
+    <p className="mt-0.5 text-[11.5px] text-ink-muted">The live strip above the hero on designs that have one (e.g. bytevex). Ignored otherwise.</p>
+    <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={dispatchEnabled} onChange={(event) => setDispatchEnabled(event.target.checked)} className="h-4 w-4 rounded border-border-strong" />Show announcement bar</label>
+    <div className="mt-3 grid grid-cols-2 gap-3">
+      <label className="text-[13px] font-semibold text-ink-secondary">Bold text<input value={dispatchText} onChange={(event) => setDispatchText(event.target.value)} placeholder="e.g. Performance media for every capture" className={inputClass} /></label>
+      <label className="text-[13px] font-semibold text-ink-secondary">Description<input value={dispatchDescription} onChange={(event) => setDispatchDescription(event.target.value)} placeholder="e.g. Explore SD, microSD, CFexpress and high-speed readers." className={inputClass} /></label>
+    </div>
+  </div>
+  <div className="border-t border-border pt-5"><label className="block text-[13px] font-semibold text-ink-secondary">Trust line<input value={trustLine} onChange={(event) => setTrustLine(event.target.value)} placeholder="e.g. TRUSTED BY CREATORS. ENGINEERED FOR MORE." className={inputClass} /></label></div>
   {cards.map((card, index) => { const previewSrc = imagePreviews[index] ?? (card.image ? (card.image.startsWith("/uploads/") ? mediaFileUrl(card.image) : card.image) : null); return <div key={index} className={index > 0 ? "border-t border-border pt-5" : undefined}>
     <p className="text-[13px] font-semibold text-ink">Card {index + 1}</p>
     <div className="mt-3 flex items-center gap-3"><div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-dashed border-border-strong bg-canvas">{previewSrc ? <NextImage unoptimized src={previewSrc} width={96} height={64} alt="" className="h-full w-full object-cover" /> : <ImageIcon className="h-5 w-5 text-ink-faint" />}</div><div><input ref={(el) => { fileInputRefs.current[index] = el; }} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => chooseImage(index, event)} className="hidden" /><button type="button" onClick={() => fileInputRefs.current[index]?.click()} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-strong px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint"><Upload className="h-3.5 w-3.5" />{imageFiles[index] ? "Replace selection" : card.image ? "Replace image" : "Choose image"}</button><p className="mt-1.5 text-[10.5px] text-ink-muted">JPG, PNG or WebP, up to 5 MB.</p></div></div>
