@@ -1,0 +1,15 @@
+[
+  {
+    "categoryId": 1,
+    "title": "Sample 128GB microSDXC Card",
+    "slug": "sample-128gb-microsdxc",
+    "sku": "SAMPLE-MSD-128-001",
+    "shortDescription": "Replace this sample description with your product details.",
+    "status": "DRAFT",
+    "initialVariant": {
+      "price": 14.99,
+      "stockQty": 10,
+      "lowStockThreshold": 2
+    }
+  }
+]
