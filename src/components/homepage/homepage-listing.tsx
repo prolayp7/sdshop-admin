@@ -43,12 +43,13 @@ const contentLink: Partial<Record<SectionType, string>> = { HERO: "/merchandisin
 const configurable: SectionType[] = ["HERO", "FEATURED_PRODUCTS", "BANNERS", "NEWSLETTER", "DEALS"];
 
 export function HomepageListing() {
+  const [allItems, setAllItems] = useState<Section[]>([]);
   const [items, setItems] = useState<Section[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Section | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
 
-  const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/homepage-sections", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) throw new Error(apiMessage(payload, "Homepage sections could not be loaded.")); setItems(collectionFromApi<Section>(payload)); setPreviewKey((key) => key + 1); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Homepage sections could not be loaded."); } finally { setLoading(false); } }, []);
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/homepage-sections", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) throw new Error(apiMessage(payload, "Homepage sections could not be loaded.")); const all = collectionFromApi<Section>(payload); setAllItems(all); setItems(all.filter((section) => section.type !== "BLOG_HIGHLIGHTS")); setPreviewKey((key) => key + 1); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Homepage sections could not be loaded."); } finally { setLoading(false); } }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
   async function toggleVisible(section: Section) { setError(""); try { const response = await fetch(`/api/homepage-sections/${section.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isVisible: !section.isVisible }) }); if (!response.ok) throw new Error(apiMessage(await response.json().catch(() => ({})), "Section could not be updated.")); await load(); } catch (toggleError) { setError(toggleError instanceof Error ? toggleError.message : "Section could not be updated."); } }
@@ -56,11 +57,18 @@ export function HomepageListing() {
   async function move(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= items.length) return;
-    const next = [...items];
-    [next[index], next[target]] = [next[target], next[index]];
-    setItems(next);
+    const selectedId = items[index]?.id;
+    const targetId = items[target]?.id;
+    if (selectedId === undefined || targetId === undefined) return;
+    const nextAll = [...allItems];
+    const selectedIndex = nextAll.findIndex((item) => item.id === selectedId);
+    const targetIndex = nextAll.findIndex((item) => item.id === targetId);
+    if (selectedIndex === -1 || targetIndex === -1) return;
+    [nextAll[selectedIndex], nextAll[targetIndex]] = [nextAll[targetIndex], nextAll[selectedIndex]];
+    setAllItems(nextAll);
+    setItems(nextAll.filter((section) => section.type !== "BLOG_HIGHLIGHTS"));
     setSaving(true); setError("");
-    try { const response = await fetch("/api/homepage-sections/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: next.map((item) => item.id) }) }); if (!response.ok) throw new Error(apiMessage(await response.json().catch(() => ({})), "Sections could not be reordered.")); await load(); } catch (moveError) { setError(moveError instanceof Error ? moveError.message : "Sections could not be reordered."); await load(); } finally { setSaving(false); }
+    try { const response = await fetch("/api/homepage-sections/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: nextAll.map((item) => item.id) }) }); if (!response.ok) throw new Error(apiMessage(await response.json().catch(() => ({})), "Sections could not be reordered.")); await load(); } catch (moveError) { setError(moveError instanceof Error ? moveError.message : "Sections could not be reordered."); await load(); } finally { setSaving(false); }
   }
 
   return <div className="w-full">
