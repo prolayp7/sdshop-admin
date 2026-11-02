@@ -21,6 +21,7 @@ import {
   Phone,
   RefreshCw,
   Search,
+  Save,
   ShoppingCart,
   Truck,
   Undo2,
@@ -28,6 +29,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export type OrderStatus =
   | "PENDING"
@@ -69,6 +71,7 @@ type OrderDetail = Order & {
   adminNote?: string | null;
   trackingCarrier?: string | null;
   trackingNumber?: string | null;
+  trackingUrl?: string | null;
   shippingMethod?: { title: string; carrier: string } | null;
   items: Array<{ id: number; titleSnapshot: string; variantTitleSnapshot: string; skuSnapshot?: string | null; quantity: number; unitPrice: string; subtotal: string; product?: { category?: { title: string } | null } | null }>;
   statusHistory: Array<{ id: number; fromStatus: OrderStatus | null; toStatus: OrderStatus; note: string | null; changedByAdmin: { name: string } | null; createdAt: string }>;
@@ -151,7 +154,7 @@ export function OrdersPage({ initialSearch = "", initialOpenId = null, initialPa
     return params;
   }, [dateFrom, dateTo, page, paymentStatus, search, status]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (refreshSidebar = false) => {
     setLoading(true);
     setError("");
     try {
@@ -165,7 +168,10 @@ export function OrdersPage({ initialSearch = "", initialOpenId = null, initialPa
       // { data: { items, meta } } - meta sits alongside data, not inside it.
       setItems((ordersPayload as { data?: Order[] }).data ?? []);
       setMeta((ordersPayload as { meta?: Meta }).meta ?? emptyMeta);
-      if (summaryResponse.ok) setSummary(unwrap<Summary>(summaryPayload));
+      if (summaryResponse.ok) {
+        setSummary(unwrap<Summary>(summaryPayload));
+        if (refreshSidebar) window.dispatchEvent(new Event("sdshop:orders-summary-refreshed"));
+      }
       setSelected(new Set());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Orders could not be loaded.");
@@ -238,7 +244,7 @@ export function OrdersPage({ initialSearch = "", initialOpenId = null, initialPa
   return <div className="pb-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div><h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink sm:text-2xl">Orders</h1><p className="mt-1 text-[13.5px] text-ink-muted">Review payments, fulfilment progress and customer deliveries.</p></div>
-      <div className="flex gap-2"><button type="button" onClick={() => void load()} disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-surface px-3.5 text-[13px] font-semibold text-ink-secondary shadow-card hover:bg-neutral-tint disabled:opacity-50"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />Refresh</button><button type="button" onClick={() => void exportOrders()} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-[13px] font-semibold text-white hover:bg-[#1d2939]"><Download className="h-4 w-4" />Export orders</button></div>
+      <div className="flex gap-2"><button type="button" onClick={() => void load(true)} disabled={loading} className="inline-flex h-10 items-center gap-2 rounded-md border border-border bg-surface px-3.5 text-[13px] font-semibold text-ink-secondary shadow-card hover:bg-neutral-tint disabled:opacity-50"><RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />Refresh</button><button type="button" onClick={() => void exportOrders()} className="inline-flex h-10 items-center gap-2 rounded-md bg-ink px-4 text-[13px] font-semibold text-white hover:bg-[#1d2939]"><Download className="h-4 w-4" />Export orders</button></div>
     </div>
 
     <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{statusCards.map(({ label: cardLabel, value, icon: Icon, bg, iconTone }) => <div key={cardLabel} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card"><span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-sm", bg, iconTone)}><Icon className="h-5 w-5" /></span><div><p className="text-[12px] font-medium text-ink-secondary">{cardLabel}</p><p className="mt-0.5 text-xl font-bold tabular-nums text-ink">{value.toLocaleString("en-GB")}</p></div></div>)}</div>
@@ -254,9 +260,9 @@ export function OrdersPage({ initialSearch = "", initialOpenId = null, initialPa
       </div>
       <div className="flex flex-col gap-2 border-b border-border bg-canvas/60 px-4 py-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 text-xs text-ink-muted"><CalendarDays className="h-4 w-4" /><span>Order date</span></div>
-        <input type="date" aria-label="Orders from" value={dateFrom} max={dateTo || undefined} onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} className="h-9 rounded-md border border-border-strong bg-surface px-2.5 text-xs text-ink-secondary" />
+        <DatePicker aria-label="Orders from" value={dateFrom} max={dateTo || undefined} onChange={(value) => { setDateFrom(value); setPage(1); }} className="h-9 w-auto min-w-36 text-xs" />
         <span className="hidden text-xs text-ink-faint sm:inline">to</span>
-        <input type="date" aria-label="Orders to" value={dateTo} min={dateFrom || undefined} onChange={(event) => { setDateTo(event.target.value); setPage(1); }} className="h-9 rounded-md border border-border-strong bg-surface px-2.5 text-xs text-ink-secondary" />
+        <DatePicker aria-label="Orders to" value={dateTo} min={dateFrom || undefined} onChange={(value) => { setDateTo(value); setPage(1); }} className="h-9 w-auto min-w-36 text-xs" />
         {filtersActive ? <button type="button" onClick={() => { setSearchInput(""); setStatus(""); setPaymentStatus(""); setDateFrom(""); setDateTo(""); setPage(1); }} className="text-xs font-semibold text-ink-secondary hover:text-ink">Clear filters</button> : null}
       </div>
 
@@ -277,9 +283,55 @@ export function OrdersPage({ initialSearch = "", initialOpenId = null, initialPa
 export function OrderDrawer({ id, onClose, onStatus }: { id: number; onClose: () => void; onStatus: (status: OrderStatus) => void }) {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [error, setError] = useState("");
-  const reload = async () => { const response = await fetch(`/api/orders/${id}`, { cache: "no-store" }); if (response.ok) setOrder(unwrap<OrderDetail>(await response.json())); };
-  useEffect(() => { const timer = window.setTimeout(async () => { try { const response = await fetch(`/api/orders/${id}`); const payload = await response.json(); if (!response.ok) throw new Error(message(payload, "Order details could not be loaded.")); setOrder(unwrap<OrderDetail>(payload)); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Order details could not be loaded."); } }, 0); return () => window.clearTimeout(timer); }, [id]);
+  const [trackingCarrier, setTrackingCarrier] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [trackingUrl, setTrackingUrl] = useState("");
+  const [trackingSaving, setTrackingSaving] = useState(false);
+  const [trackingMessage, setTrackingMessage] = useState("");
+  const [trackingError, setTrackingError] = useState("");
+  const applyOrder = useCallback((nextOrder: OrderDetail) => {
+    setOrder(nextOrder);
+    setTrackingCarrier(nextOrder.trackingCarrier ?? "");
+    setTrackingNumber(nextOrder.trackingNumber ?? "");
+    setTrackingUrl(nextOrder.trackingUrl ?? "");
+  }, []);
+  const reload = useCallback(async () => {
+    const response = await fetch(`/api/orders/${id}`, { cache: "no-store" });
+    if (response.ok) applyOrder(unwrap<OrderDetail>(await response.json()));
+  }, [id, applyOrder]);
+  useEffect(() => { const timer = window.setTimeout(async () => { try { const response = await fetch(`/api/orders/${id}`); const payload = await response.json(); if (!response.ok) throw new Error(message(payload, "Order details could not be loaded.")); applyOrder(unwrap<OrderDetail>(payload)); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Order details could not be loaded."); } }, 0); return () => window.clearTimeout(timer); }, [id, applyOrder]);
   useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); }; document.addEventListener("keydown", close); return () => document.removeEventListener("keydown", close); }, [onClose]);
+
+  async function saveTracking(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTrackingSaving(true);
+    setTrackingMessage("");
+    setTrackingError("");
+    try {
+      const response = await fetch(`/api/orders/${id}/tracking`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trackingCarrier: trackingCarrier.trim(),
+          trackingNumber: trackingNumber.trim(),
+          trackingUrl: trackingUrl.trim() || null,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(message(payload, "Tracking details could not be saved."));
+      setOrder((current) => current ? {
+        ...current,
+        trackingCarrier: trackingCarrier.trim(),
+        trackingNumber: trackingNumber.trim(),
+        trackingUrl: trackingUrl.trim() || null,
+      } : current);
+      setTrackingMessage("Tracking details saved.");
+    } catch (saveError) {
+      setTrackingError(saveError instanceof Error ? saveError.message : "Tracking details could not be saved.");
+    } finally {
+      setTrackingSaving(false);
+    }
+  }
 
   const totalItems = order?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   const deliveredEntry = order?.statusHistory.find((entry) => entry.toStatus === "DELIVERED");
@@ -319,7 +371,33 @@ export function OrderDrawer({ id, onClose, onStatus }: { id: number; onClose: ()
 
           <section><h3 className="text-[13px] font-semibold text-ink">Order Tracking</h3><div className="mt-3">{order.statusHistory.map((entry, index) => { const current = index === order.statusHistory.length - 1; return <div key={entry.id} className="relative flex gap-3 pb-6 last:pb-0">{index < order.statusHistory.length - 1 ? <span className="absolute left-[11px] top-6 bottom-0 w-px bg-border" /> : null}<span className={cn("z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full", current ? "bg-positive text-white" : "bg-neutral-tint text-ink-muted")}>{current ? <Check className="h-3.5 w-3.5" /> : <span className="h-2 w-2 rounded-full bg-current" />}</span><div className="flex-1 pt-0.5"><div className="flex items-baseline justify-between gap-3"><p className="text-xs font-semibold text-ink">{label(entry.toStatus)}</p><p className="shrink-0 text-[10.5px] text-ink-muted">{new Date(entry.createdAt).toLocaleDateString("en-GB")}, {new Date(entry.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</p></div><p className="mt-0.5 text-[11px] text-ink-muted">{entry.changedByAdmin ? `Changed by ${entry.changedByAdmin.name}` : "Automatic update"}{entry.note ? ` · ${entry.note}` : ""}</p></div></div>; })}{!order.statusHistory.length ? <p className="text-xs text-ink-muted">No status history yet.</p> : null}</div></section>
 
-          {order.trackingNumber ? <section><h3 className="text-[13px] font-semibold text-ink">Tracking</h3><p className="mt-2 font-mono text-xs text-ink-secondary">{order.trackingCarrier || "Carrier"} · {order.trackingNumber}</p></section> : null}
+          <section>
+            <h3 className="text-[13px] font-semibold text-ink">Manual tracking</h3>
+            <p className="mt-1 text-xs text-ink-muted">Enter the carrier and tracking details supplied by your delivery provider.</p>
+            <form onSubmit={(event) => void saveTracking(event)} className="mt-3 grid gap-3 sm:grid-cols-3">
+              <label className="text-xs font-semibold text-ink-secondary">
+                Carrier
+                <input required maxLength={255} value={trackingCarrier} onChange={(event) => setTrackingCarrier(event.target.value)} placeholder="e.g. Royal Mail" className="mt-1.5 h-9 w-full rounded-md border border-border-strong bg-surface px-3 text-xs font-normal outline-none focus:border-accent-strong" />
+              </label>
+              <label className="text-xs font-semibold text-ink-secondary">
+                Tracking number
+                <input required maxLength={255} value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} className="mt-1.5 h-9 w-full rounded-md border border-border-strong bg-surface px-3 font-mono text-xs font-normal outline-none focus:border-accent-strong" />
+              </label>
+              <label className="text-xs font-semibold text-ink-secondary">
+                Tracking URL
+                <input type="url" value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} placeholder="https://…" className="mt-1.5 h-9 w-full rounded-md border border-border-strong bg-surface px-3 text-xs font-normal outline-none focus:border-accent-strong" />
+              </label>
+              <div className="sm:col-span-3">
+                {trackingError ? <p role="alert" className="text-xs text-danger">{trackingError}</p> : trackingMessage ? <p role="status" className="text-xs text-positive-tint-ink">{trackingMessage}</p> : null}
+              </div>
+              <div className="sm:col-span-3">
+                <button type="submit" disabled={trackingSaving || !trackingCarrier.trim() || !trackingNumber.trim()} className="inline-flex h-9 items-center gap-2 rounded-md bg-ink px-3.5 text-xs font-semibold text-white disabled:opacity-50">
+                  {trackingSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save tracking
+                </button>
+              </div>
+            </form>
+          </section>
         </div>}
       </div>
     </div>

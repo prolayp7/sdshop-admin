@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Camera, ChevronDown, Clapperboard, Cpu, Database, Gauge, HardDrive, MemoryStick, MonitorPlay, Package, Plane, Plus, ShieldCheck, Smartphone, Trash2, Zap, type LucideIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
+import { collectionFromApi } from "@/lib/api-response";
 
 export type MegaMenuEntry = { title: string; detail: string; href: string; icon: string; badge: string; featured: boolean };
 export type MegaMenuSection = { id: string; title: string; icon: string; entries: MegaMenuEntry[]; runtimeTitle?: string; metrics?: { value: string; label: string }[] };
@@ -68,6 +70,7 @@ export function contentFromApi(value: unknown): MegaMenuContent | null {
 
 const inputClass = "mt-1.5 h-9 w-full rounded-md border border-border-strong bg-surface px-2.5 text-xs font-normal text-ink outline-none placeholder:text-ink-faint focus:border-accent-strong";
 const labelClass = "block text-[11px] font-semibold text-ink-muted";
+type Category = { id: number; title: string; slug: string; parentId: number | null; parent: { title: string } | null; status: "ACTIVE" | "INACTIVE" };
 const iconOptions: { name: string; Icon: LucideIcon }[] = [
   { name: "Cpu", Icon: Cpu }, { name: "MemoryStick", Icon: MemoryStick }, { name: "Smartphone", Icon: Smartphone },
   { name: "Zap", Icon: Zap }, { name: "Camera", Icon: Camera }, { name: "HardDrive", Icon: HardDrive },
@@ -99,6 +102,23 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
 }
 
 export function MegaMenuContentEditor({ value, onChange }: { value: MegaMenuContent; onChange: (value: MegaMenuContent) => void }) {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesError, setCategoriesError] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/catalog/categories?page=1&perPage=100", { cache: "no-store", signal: controller.signal });
+        const payload = await response.json();
+        if (!response.ok) throw new Error("Shop categories could not be loaded.");
+        setCategories(collectionFromApi<Category>(payload).filter((category) => category.status === "ACTIVE"));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setCategoriesError(error instanceof Error ? error.message : "Shop categories could not be loaded.");
+      }
+    }, 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, []);
   const updateSection = (index: number, patch: Partial<MegaMenuSection>) => onChange({ ...value, sections: value.sections.map((section, i) => i === index ? { ...section, ...patch } : section) });
   const updateEntry = (sectionIndex: number, entryIndex: number, patch: Partial<MegaMenuEntry>) => updateSection(sectionIndex, { entries: value.sections[sectionIndex].entries.map((entry, i) => i === entryIndex ? { ...entry, ...patch } : entry) });
   const updatePromo = (patch: Partial<MegaMenuContent["promo"]>) => onChange({ ...value, promo: { ...value.promo, ...patch } });
@@ -110,14 +130,20 @@ export function MegaMenuContentEditor({ value, onChange }: { value: MegaMenuCont
     [sections[index], sections[target]] = [sections[target], sections[index]];
     onChange({ ...value, sections });
   };
+  const destinationOptions: SearchableOption[] = categories.map((category) => ({
+    value: `/c/${category.slug}`,
+    label: category.parent?.title ? `${category.parent.title} / ${category.title}` : category.title,
+  }));
+  const categoryDestinations = new Set(destinationOptions.map((option) => option.value));
 
   return <div className="space-y-4">
     <div><h3 className="text-sm font-semibold text-ink">Mega-menu sections</h3><p className="mt-1 text-xs text-ink-muted">Edit each section and the links shown in the header panel.</p></div>
+    {categoriesError ? <p role="alert" className="rounded-md bg-danger-tint p-2.5 text-xs text-danger-tint-ink">{categoriesError}</p> : null}
     {value.sections.map((section, sectionIndex) => <section key={section.id} className="rounded-lg border border-border bg-canvas p-3">
       <div className="flex items-start gap-2"><div className="grid flex-1 gap-3 sm:grid-cols-[1fr_150px]"><Field label="Section heading" value={section.title} onChange={(title) => updateSection(sectionIndex, { title })} /><label className={labelClass}>Heading icon<MenuIconPicker label={`${section.title} heading icon`} value={section.icon} onChange={(icon) => updateSection(sectionIndex, { icon })} /></label></div><div className="mt-4 flex shrink-0 items-center">{([-1, 1] as const).map((delta) => <button key={delta} type="button" aria-label={delta < 0 ? `Move ${section.title} up` : `Move ${section.title} down`} disabled={sectionIndex + delta < 0 || sectionIndex + delta >= value.sections.length} onClick={() => moveSection(sectionIndex, delta)} className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-surface disabled:opacity-30">{delta < 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}</button>)}<button type="button" onClick={() => onChange({ ...value, sections: value.sections.filter((_, i) => i !== sectionIndex) })} aria-label={`Remove ${section.title}`} className="flex h-8 w-8 items-center justify-center rounded-md text-ink-muted hover:bg-danger-tint hover:text-danger-tint-ink"><Trash2 className="h-4 w-4" /></button></div></div>
       <div className="mt-3 space-y-3">{section.entries.map((entry, entryIndex) => <div key={entryIndex} className="rounded-md border border-border bg-surface p-3">
         <div className="mb-2 flex items-center justify-between"><span className="text-xs font-semibold text-ink-secondary">Item {entryIndex + 1}</span><button type="button" onClick={() => updateSection(sectionIndex, { entries: section.entries.filter((_, i) => i !== entryIndex) })} aria-label={`Remove ${entry.title || "item"}`} className="flex h-7 w-7 items-center justify-center rounded-md text-ink-muted hover:bg-danger-tint hover:text-danger-tint-ink"><Trash2 className="h-3.5 w-3.5" /></button></div>
-        <div className="grid gap-2 sm:grid-cols-2"><Field label="Title" value={entry.title} onChange={(title) => updateEntry(sectionIndex, entryIndex, { title })} /><Field label="Detail" value={entry.detail} onChange={(detail) => updateEntry(sectionIndex, entryIndex, { detail })} /><Field label="Destination URL" value={entry.href} onChange={(href) => updateEntry(sectionIndex, entryIndex, { href })} placeholder="/c/sd-cards or /c?q=V90" /><Field label="Badge (optional)" value={entry.badge} onChange={(badge) => updateEntry(sectionIndex, entryIndex, { badge })} placeholder="V90, MOST POPULAR" /><label className={labelClass}>Icon<MenuIconPicker label={`${entry.title || `item ${entryIndex + 1}`} icon`} value={entry.icon} onChange={(icon) => updateEntry(sectionIndex, entryIndex, { icon })} /></label><label className="mt-5 flex items-center gap-2 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={entry.featured} onChange={(event) => updateEntry(sectionIndex, entryIndex, { featured: event.target.checked })} className="h-4 w-4 accent-ink" />Featured</label></div>
+        <div className="grid gap-2 sm:grid-cols-2"><Field label="Title" value={entry.title} onChange={(title) => updateEntry(sectionIndex, entryIndex, { title })} /><Field label="Detail" value={entry.detail} onChange={(detail) => updateEntry(sectionIndex, entryIndex, { detail })} /><label className={labelClass}>Destination URL<SearchableSelect value={entry.href} onChange={(href) => updateEntry(sectionIndex, entryIndex, { href })} options={entry.href && !categoryDestinations.has(entry.href) ? [{ value: entry.href, label: `Current destination: ${entry.href}` }, ...destinationOptions] : destinationOptions} placeholder={categories.length ? "Search shop categories…" : "Loading shop categories…"} searchPlaceholder="Search shop categories…" ariaLabel={`Destination category for ${entry.title || `item ${entryIndex + 1}`}`} /></label><Field label="Badge (optional)" value={entry.badge} onChange={(badge) => updateEntry(sectionIndex, entryIndex, { badge })} placeholder="V90, MOST POPULAR" /><label className={labelClass}>Icon<MenuIconPicker label={`${entry.title || `item ${entryIndex + 1}`} icon`} value={entry.icon} onChange={(icon) => updateEntry(sectionIndex, entryIndex, { icon })} /></label><label className="mt-5 flex items-center gap-2 text-xs font-semibold text-ink-secondary"><input type="checkbox" checked={entry.featured} onChange={(event) => updateEntry(sectionIndex, entryIndex, { featured: event.target.checked })} className="h-4 w-4 accent-ink" />Featured</label></div>
       </div>)}
       <button type="button" onClick={() => updateSection(sectionIndex, { entries: [...section.entries, { title: "", detail: "", href: "", icon: "", badge: "", featured: false }] })} className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-semibold text-ink-secondary hover:bg-surface"><Plus className="h-3.5 w-3.5" />Add item</button></div>
       {section.id === "capacity" ? <div className="mt-3 border-t border-border pt-3"><Field label="Runtime panel heading" value={section.runtimeTitle ?? ""} onChange={(runtimeTitle) => updateSection(sectionIndex, { runtimeTitle })} /><div className="mt-2 grid gap-2 sm:grid-cols-2">{(section.metrics ?? []).map((metric, metricIndex) => <div key={metricIndex} className="grid grid-cols-2 gap-2"><Field label="Metric value" value={metric.value} onChange={(value) => updateSection(sectionIndex, { metrics: section.metrics?.map((item, i) => i === metricIndex ? { ...item, value } : item) })} /><Field label="Metric label" value={metric.label} onChange={(label) => updateSection(sectionIndex, { metrics: section.metrics?.map((item, i) => i === metricIndex ? { ...item, label } : item) })} /></div>)}</div></div> : null}

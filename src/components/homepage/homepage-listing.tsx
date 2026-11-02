@@ -5,6 +5,7 @@ import Link from "next/link";
 import NextImage from "next/image";
 import { AlertTriangle, ArrowDown, ArrowUp, BookOpen, Compass, ExternalLink, FileSearch, Gamepad2, Gift, Grid3x3, Image as ImageIcon, Images, Laptop, LayoutTemplate, LoaderCircle, Mail, MessageSquareQuote, Newspaper, Percent, RefreshCw, ShieldCheck, Sparkles, Store, Tag, Upload } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DateTimePicker } from "@/components/ui/date-picker";
 import { collectionFromApi } from "@/lib/api-response";
 import { mediaFileUrl, type MediaItem } from "@/lib/media";
 
@@ -17,19 +18,26 @@ type FeaturedSection = { id: number; title: string; slug: string };
 const inputClass = "mt-2 h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[13px] font-normal text-ink outline-none placeholder:text-ink-faint focus:border-accent-strong";
 function apiMessage(payload: unknown, fallback: string) { if (payload && typeof payload === "object" && "message" in payload) { const value = (payload as { message?: unknown }).message; if (typeof value === "string") return value; if (Array.isArray(value) && typeof value[0] === "string") return value[0]; } return fallback; }
 
+const storefrontSectionTypes: SectionType[] = ["HERO", "DEALS", "FEATURED_PRODUCTS", "BRANDS", "NEW_ARRIVALS", "CATEGORY_SHOWCASE"];
+function getStorefrontSections(sections: Section[]) {
+  return sections
+    .filter((section) => storefrontSectionTypes.includes(section.type))
+    .sort((a, b) => Number(b.type === "HERO") - Number(a.type === "HERO"));
+}
+
 const meta: Record<SectionType, { icon: typeof LayoutTemplate; description: string }> = {
-  HERO: { icon: LayoutTemplate, description: "Homepage hero carousel." },
+  HERO: { icon: LayoutTemplate, description: "BYTEVEX featured-product carousel." },
   TRUST_STRIP: { icon: ShieldCheck, description: "Delivery, warranty and finance trust badges." },
-  DEALS: { icon: Percent, description: "Automatic — products currently on sale." },
-  FEATURED_PRODUCTS: { icon: Sparkles, description: "A curated product rail." },
-  NEW_ARRIVALS: { icon: Sparkles, description: "Automatic — most recently added products." },
-  BRANDS: { icon: Store, description: "Automatic — brand logos grid." },
+  DEALS: { icon: Percent, description: "Current discounted products in the homepage content column." },
+  FEATURED_PRODUCTS: { icon: Sparkles, description: "Curated products in the homepage content column." },
+  NEW_ARRIVALS: { icon: Sparkles, description: "Recently added products in the homepage content column." },
+  BRANDS: { icon: Store, description: "Popular brands in the homepage content column." },
   TESTIMONIALS: { icon: MessageSquareQuote, description: "Customer testimonials." },
   BLOG_HIGHLIGHTS: { icon: Newspaper, description: "Latest published blog posts." },
   FAQS: { icon: Tag, description: "Frequently asked questions." },
   BANNERS: { icon: Images, description: "Promotional banners at a given position." },
   NEWSLETTER: { icon: Mail, description: "Email signup strip." },
-  CATEGORY_SHOWCASE: { icon: Grid3x3, description: "Automatic — category tiles grid." },
+  CATEGORY_SHOWCASE: { icon: Grid3x3, description: "Category banners in the homepage content column." },
   SHOP_BY_NEED: { icon: Compass, description: "Fixed content — task-based shopping cards." },
   GAMING_SHOWCASE: { icon: Gamepad2, description: "Fixed content — pre-built gaming PC tiers." },
   LAPTOP_SHOWCASE: { icon: Laptop, description: "Fixed content — laptop category cards." },
@@ -40,7 +48,7 @@ const meta: Record<SectionType, { icon: typeof LayoutTemplate; description: stri
 // admin page (this Homepage view only controls order/visibility for those),
 // some open a small config editor here, and the fully-automatic ones need no editor.
 const contentLink: Partial<Record<SectionType, string>> = { HERO: "/merchandising", TRUST_STRIP: "/merchandising", TESTIMONIALS: "/support-content", BLOG_HIGHLIGHTS: "/blog", FAQS: "/support-content" };
-const configurable: SectionType[] = ["HERO", "FEATURED_PRODUCTS", "BANNERS", "NEWSLETTER", "DEALS"];
+const configurable: SectionType[] = ["FEATURED_PRODUCTS"];
 
 export function HomepageListing() {
   const [allItems, setAllItems] = useState<Section[]>([]);
@@ -49,7 +57,7 @@ export function HomepageListing() {
   const [editing, setEditing] = useState<Section | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
 
-  const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/homepage-sections", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) throw new Error(apiMessage(payload, "Homepage sections could not be loaded.")); const all = collectionFromApi<Section>(payload); setAllItems(all); setItems(all.filter((section) => section.type !== "BLOG_HIGHLIGHTS")); setPreviewKey((key) => key + 1); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Homepage sections could not be loaded."); } finally { setLoading(false); } }, []);
+  const load = useCallback(async () => { setLoading(true); setError(""); try { const response = await fetch("/api/homepage-sections", { cache: "no-store" }); const payload = await response.json(); if (!response.ok) throw new Error(apiMessage(payload, "Homepage sections could not be loaded.")); const all = collectionFromApi<Section>(payload); setAllItems(all); setItems(getStorefrontSections(all)); setPreviewKey((key) => key + 1); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Homepage sections could not be loaded."); } finally { setLoading(false); } }, []);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(timer); }, [load]);
 
   async function toggleVisible(section: Section) { setError(""); try { const response = await fetch(`/api/homepage-sections/${section.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isVisible: !section.isVisible }) }); if (!response.ok) throw new Error(apiMessage(await response.json().catch(() => ({})), "Section could not be updated.")); await load(); } catch (toggleError) { setError(toggleError instanceof Error ? toggleError.message : "Section could not be updated."); } }
@@ -59,6 +67,7 @@ export function HomepageListing() {
     if (target < 0 || target >= items.length) return;
     const selectedId = items[index]?.id;
     const targetId = items[target]?.id;
+    if (items[index]?.type === "HERO" || items[target]?.type === "HERO") return;
     if (selectedId === undefined || targetId === undefined) return;
     const nextAll = [...allItems];
     const selectedIndex = nextAll.findIndex((item) => item.id === selectedId);
@@ -66,7 +75,7 @@ export function HomepageListing() {
     if (selectedIndex === -1 || targetIndex === -1) return;
     [nextAll[selectedIndex], nextAll[targetIndex]] = [nextAll[targetIndex], nextAll[selectedIndex]];
     setAllItems(nextAll);
-    setItems(nextAll.filter((section) => section.type !== "BLOG_HIGHLIGHTS"));
+    setItems(getStorefrontSections(nextAll));
     setSaving(true); setError("");
     try { const response = await fetch("/api/homepage-sections/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: nextAll.map((item) => item.id) }) }); if (!response.ok) throw new Error(apiMessage(await response.json().catch(() => ({})), "Sections could not be reordered.")); await load(); } catch (moveError) { setError(moveError instanceof Error ? moveError.message : "Sections could not be reordered."); await load(); } finally { setSaving(false); }
   }
@@ -75,14 +84,15 @@ export function HomepageListing() {
   {error ? <div role="alert" className="mb-4 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}
   <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
     <div className="min-w-0 xl:w-[380px] xl:shrink-0">
-      <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Homepage</h1><p className="mt-1 text-[13.5px] text-ink-muted">Every section of the homepage, reorderable and switchable without a deployment.</p>
+      <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Homepage</h1><p className="mt-1 text-[13.5px] text-ink-muted">Manage sections currently rendered by BYTEVEX. The hero stays first; shopping help, customer reviews, recommendations and the footer remain in fixed storefront positions. Legacy section types not rendered by this storefront are omitted.</p>
       <div className="mt-5">{loading ? <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="h-5 w-5 animate-spin text-ink-muted" /></div> : <div className="space-y-2.5">{items.map((section, index) => {
       const Icon = meta[section.type].icon;
       const link = contentLink[section.type];
       const canConfigure = configurable.includes(section.type);
+      const firstMovableIndex = items[0]?.type === "HERO" ? 1 : 0;
       return <div key={section.id} className="rounded-xl border border-border bg-surface p-3.5 shadow-card">
         <div className="flex items-start gap-2.5">
-          <div className="flex shrink-0 flex-col gap-0.5"><button type="button" onClick={() => void move(index, -1)} disabled={saving || index === 0} aria-label="Move up" className="flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-neutral-tint disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" onClick={() => void move(index, 1)} disabled={saving || index === items.length - 1} aria-label="Move down" className="flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-neutral-tint disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button></div>
+      <div className="flex shrink-0 flex-col gap-0.5"><button type="button" onClick={() => void move(index, -1)} disabled={saving || section.type === "HERO" || index === firstMovableIndex} aria-label="Move up" className="flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-neutral-tint disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button><button type="button" onClick={() => void move(index, 1)} disabled={saving || section.type === "HERO" || index === items.length - 1} aria-label="Move down" className="flex h-6 w-6 items-center justify-center rounded text-ink-muted hover:bg-neutral-tint disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button></div>
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-canvas text-[11px] font-semibold text-ink-secondary">{index + 1}</span>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-neutral-tint text-ink-muted"><Icon className="h-4 w-4" /></span>
           <div className="min-w-0 flex-1"><p className="truncate text-[13px] font-semibold text-ink">{section.label}</p><p className="mt-0.5 text-xs text-ink-muted">{meta[section.type].description}</p></div>
@@ -90,7 +100,7 @@ export function HomepageListing() {
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
           <label className="flex items-center gap-2 text-xs font-semibold text-ink-secondary"><span className="relative inline-flex h-5 w-9 shrink-0"><input type="checkbox" checked={section.isVisible} onChange={() => void toggleVisible(section)} className="peer sr-only" /><span className="absolute inset-0 rounded-full bg-border-strong transition-colors peer-checked:bg-positive" /><span className="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-4" /></span>{section.isVisible ? "Visible" : "Hidden"}</label>
           {section.type === "HERO"
-            ? <div className="flex items-center gap-2">{link ? <Link href={link} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Manage slides<ExternalLink className="h-3.5 w-3.5" /></Link> : null}<button type="button" onClick={() => setEditing(section)} className="h-8 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit hero content</button></div>
+            ? <div className="flex items-center gap-2">{link ? <Link href={link} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Manage slides<ExternalLink className="h-3.5 w-3.5" /></Link> : null}</div>
             : canConfigure ? <button type="button" onClick={() => setEditing(section)} className="h-8 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit content</button>
             : link ? <Link href={link} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-semibold text-ink-secondary hover:bg-neutral-tint">Edit content<ExternalLink className="h-3.5 w-3.5" /></Link>
             : <span className="text-xs text-ink-faint">No settings</span>}
@@ -228,7 +238,7 @@ function DealsConfigDialog({ section, onClose, onSaved }: { section: Section; on
   const [endsAt, setEndsAt] = useState(typeof section.config.endsAt === "string" ? toLocalInputValue(section.config.endsAt) : "");
   const [saving, setSaving] = useState(false), [error, setError] = useState("");
   async function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(""); try { await saveConfig(section.id, { heading: heading.trim() || undefined, body: body.trim() || undefined, endsAt: endsAt ? new Date(endsAt).toISOString() : null }); onClose(); await onSaved(); } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "Section could not be saved."); } finally { setSaving(false); } }
-  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent><DialogHeader><DialogTitle>Today&rsquo;s deals</DialogTitle><DialogDescription>Heading, copy and countdown for the deals banner. Leave a field blank to use its automatic default.</DialogDescription></DialogHeader><form onSubmit={(event) => void submit(event)}>{error ? <div role="alert" className="mb-3 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}<label className="text-[13px] font-semibold text-ink-secondary">Heading<input value={heading} onChange={(event) => setHeading(event.target.value)} placeholder="Today's Best Deals" className={inputClass} /></label><label className="mt-4 block text-[13px] font-semibold text-ink-secondary">Body<textarea value={body} onChange={(event) => setBody(event.target.value)} rows={2} placeholder="Auto: “N lines reduced…” with the live on-sale count" className={`${inputClass} h-auto resize-y py-2`} /></label><label className="mt-4 block text-[13px] font-semibold text-ink-secondary">Countdown ends<input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} className={inputClass} /></label><DialogFooter className="mt-4"><button type="button" onClick={onClose} className="h-9 rounded-md border border-border px-4 text-xs font-semibold text-ink-secondary">Cancel</button><button type="submit" disabled={saving} className="inline-flex h-9 items-center gap-2 rounded-md bg-ink px-4 text-xs font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}Save</button></DialogFooter></form></DialogContent></Dialog>;
+  return <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}><DialogContent><DialogHeader><DialogTitle>Today&rsquo;s deals</DialogTitle><DialogDescription>Heading, copy and countdown for the deals banner. Leave a field blank to use its automatic default.</DialogDescription></DialogHeader><form onSubmit={(event) => void submit(event)}>{error ? <div role="alert" className="mb-3 flex items-start gap-2 rounded-md bg-danger-tint p-3 text-xs text-danger-tint-ink ring-1 ring-inset ring-danger-tint-border"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div> : null}<label className="text-[13px] font-semibold text-ink-secondary">Heading<input value={heading} onChange={(event) => setHeading(event.target.value)} placeholder="Today's Best Deals" className={inputClass} /></label><label className="mt-4 block text-[13px] font-semibold text-ink-secondary">Body<textarea value={body} onChange={(event) => setBody(event.target.value)} rows={2} placeholder="Auto: “N lines reduced…” with the live on-sale count" className={`${inputClass} h-auto resize-y py-2`} /></label><label className="mt-4 block text-[13px] font-semibold text-ink-secondary">Countdown ends<DateTimePicker value={endsAt} onChange={setEndsAt} aria-label="Countdown ends" className="mt-2" /></label><DialogFooter className="mt-4"><button type="button" onClick={onClose} className="h-9 rounded-md border border-border px-4 text-xs font-semibold text-ink-secondary">Cancel</button><button type="submit" disabled={saving} className="inline-flex h-9 items-center gap-2 rounded-md bg-ink px-4 text-xs font-semibold text-white disabled:opacity-50">{saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}Save</button></DialogFooter></form></DialogContent></Dialog>;
 }
 
 function NewsletterConfigDialog({ section, onClose, onSaved }: { section: Section; onClose: () => void; onSaved: () => Promise<void> }) {

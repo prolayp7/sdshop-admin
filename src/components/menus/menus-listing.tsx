@@ -1,9 +1,10 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { AlertTriangle, LayoutPanelTop, LoaderCircle, Menu as MenuIcon, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, LayoutPanelTop, LoaderCircle, Menu as MenuIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DrawerContent } from "@/components/ui/dialog";
 import { contentFromApi, defaultMegaMenuContent, MegaMenuContentEditor, type MegaMenuContent } from "@/components/menus/mega-menu-content-editor";
+import { SearchableSelect, type SearchableOption } from "@/components/ui/searchable-select";
 import { collectionFromApi } from "@/lib/api-response";
 
 type Status = "ACTIVE" | "INACTIVE";
@@ -61,36 +62,43 @@ function ItemDialog({ menu, item, onClose, onSaved }: { menu: Menu; item: MenuIt
 }
 
 function CategoryPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const [label, setLabel] = useState(""), [search, setSearch] = useState(""), [results, setResults] = useState<{ id: number; title: string }[]>([]), [loading, setLoading] = useState(false);
-  // Resolve the selected category's title once for display instead of loading every category.
+  const [categories, setCategories] = useState<{ id: number; title: string; slug: string; parent: { title: string } | null }[]>([]);
+  const [loading, setLoading] = useState(true), [error, setError] = useState("");
   useEffect(() => {
-    if (!value) return;
-    let cancelled = false;
-    fetch(`/api/catalog/categories/${value}`).then((response) => response.json()).then((payload) => { const category = payload.data ?? payload; if (!cancelled && category?.title) setLabel(category.title); }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [value]);
-  useEffect(() => {
-    const query = search.trim();
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
-      if (query.length < 2) { setResults([]); return; }
-      setLoading(true);
       try {
-        const response = await fetch(`/api/catalog/categories?q=${encodeURIComponent(query)}&perPage=8`, { signal: controller.signal });
+        const response = await fetch("/api/catalog/categories?page=1&perPage=100", { cache: "no-store", signal: controller.signal });
         const payload = await response.json();
-        if (response.ok) setResults(collectionFromApi<{ id: number; title: string }>(payload));
+        if (!response.ok) throw new Error(apiMessage(payload, "Categories could not be loaded."));
+        setCategories(collectionFromApi<{ id: number; title: string; slug: string; parent: { title: string } | null }>(payload));
       } catch (searchError) {
-        if (!(searchError instanceof DOMException && searchError.name === "AbortError")) setResults([]);
-      } finally { setLoading(false); }
-    }, 300);
+        if (searchError instanceof DOMException && searchError.name === "AbortError") return;
+        setError(searchError instanceof Error ? searchError.message : "Categories could not be loaded.");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [search]);
-  if (value) return <div className="mt-2 flex h-10 items-center justify-between rounded-md border border-border-strong bg-canvas px-3"><span className="truncate text-[13px] font-semibold text-ink">{label || `Category #${value}`}</span><button type="button" onClick={() => { onChange(""); setLabel(""); }} aria-label="Clear category" className="text-ink-muted hover:text-ink"><X className="h-3.5 w-3.5" /></button></div>;
-  return <div className="relative mt-2">
-    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
-    <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search categories…" className={`${inputClass} mt-0 pl-9`} />
-    {loading ? <LoaderCircle className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-ink-muted" /> : null}
-    {results.length ? <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border border-border bg-surface shadow-card">{results.map((category) => <button key={category.id} type="button" onClick={() => { onChange(String(category.id)); setLabel(category.title); setSearch(""); setResults([]); }} className="flex w-full items-center px-3 py-2.5 text-left text-[13px] font-normal text-ink hover:bg-neutral-tint">{category.title}</button>)}</div> : search.trim().length >= 2 && !loading ? <p className="mt-2 text-xs font-normal text-ink-muted">No matching categories.</p> : null}
+  }, []);
+  const options: SearchableOption[] = categories.map((category) => ({
+    value: String(category.id),
+    label: category.parent?.title ? `${category.parent.title} / ${category.title}` : category.title,
+  }));
+  if (value && !options.some((option) => option.value === value)) {
+    options.unshift({ value, label: `Category #${value}` });
+  }
+  return <div>
+    <SearchableSelect
+      value={value}
+      onChange={onChange}
+      options={options}
+      placeholder={loading ? "Loading categories…" : "Search categories…"}
+      searchPlaceholder="Search categories…"
+      emptyLabel="No category"
+      ariaLabel="Menu item category"
+    />
+    {error ? <p role="alert" className="mt-1.5 text-xs font-normal text-danger-tint-ink">{error}</p> : null}
   </div>;
 }
 
